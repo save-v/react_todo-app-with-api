@@ -7,6 +7,8 @@ import React, {
   useState,
   useRef,
   useEffect,
+  FormEvent,
+  KeyboardEvent,
 } from 'react';
 import { Todo } from '../../types/Todo';
 import cN from 'classnames';
@@ -14,17 +16,20 @@ import cN from 'classnames';
 type Props = {
   todo: Todo;
   isTemp?: boolean;
-  handleTodoStatusChange?: (id: number) => void;
+  handleTodoStatusChange?: (id: number, newStatus: boolean) => Promise<void>;
   onDelete?: (id: number) => Promise<void>;
   isDeletingTodo?: boolean;
   todoToDeleteIds?: number[] | null;
   setTodoToDeleteIds?: Dispatch<SetStateAction<number[] | null>>;
   addTodoField?: RefObject<HTMLInputElement>;
   isUpdatingStatus?: boolean;
-  statusChangeId?: number | null;
+  statusChangeId?: number[];
   setEditingTodoId?: Dispatch<SetStateAction<number | null>>;
   editingTodoId?: number | null;
-  handleTitleChange?: (newTitle: string) => void;
+  handleTitleChange?: (
+    newTitle: string,
+    currentTitle: string,
+  ) => Promise<void> | undefined;
   isUpdatingTitle?: boolean | null;
 };
 
@@ -54,6 +59,53 @@ export const TodoItem: React.FC<Props> = ({
     }
   }, [editingTodoId]);
 
+  function trimTitle(text: string) {
+    return text.replace(/\s+/g, ' ').trim();
+  }
+
+  function handlerOnKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === 'Escape') {
+      setEditingTodoId?.(null);
+    }
+  }
+
+  function handlerOnDelete() {
+    setTodoToDeleteIds?.([id]);
+    onDelete?.(id).then(() => {
+      if (addTodoField?.current !== null) {
+        addTodoField?.current.focus();
+      }
+    });
+  }
+
+  function handlerOnSubmit(
+    newTitle: string,
+    currentTitle: string,
+    event?: FormEvent<HTMLFormElement>,
+  ) {
+    if (event) {
+      event.preventDefault();
+    }
+
+    if (newTitle.length === 0) {
+      handlerOnDelete();
+
+      return;
+    }
+
+    const result = handleTitleChange?.(newTitle, currentTitle);
+
+    result
+      ?.then(() => {
+        setInputValue(trimTitle(inputValue));
+      })
+      .catch(() => {
+        if (editTodoField.current !== null) {
+          editTodoField.current.focus();
+        }
+      });
+  }
+
   return (
     <div key={id} data-cy="Todo" className={cN('todo', { completed })}>
       <label className="todo__status-label">
@@ -62,15 +114,18 @@ export const TodoItem: React.FC<Props> = ({
           type="checkbox"
           className="todo__status"
           checked={completed}
-          onChange={() => (isTemp ? null : handleTodoStatusChange?.(id))}
+          onChange={() =>
+            isTemp ? null : handleTodoStatusChange?.(id, !completed)
+          }
         />
       </label>
       {id === editingTodoId ? (
-        <form onSubmit={() => handleTitleChange?.(inputValue)}>
+        <form onSubmit={event => handlerOnSubmit(inputValue, title, event)}>
           <input
             onBlur={() => {
-              handleTitleChange?.(inputValue);
+              handlerOnSubmit(inputValue, title);
             }}
+            onKeyDown={handlerOnKeyDown}
             ref={editTodoField}
             data-cy="TodoTitleField"
             type="text"
@@ -91,12 +146,7 @@ export const TodoItem: React.FC<Props> = ({
           </span>
           <button
             onClick={() => {
-              setTodoToDeleteIds?.([id]);
-              onDelete?.(id).then(() => {
-                if (addTodoField?.current !== null) {
-                  addTodoField?.current.focus();
-                }
-              });
+              handlerOnDelete();
             }}
             type="button"
             className="todo__remove"
@@ -113,7 +163,7 @@ export const TodoItem: React.FC<Props> = ({
           'is-active':
             isTemp ||
             (isDeletingTodo && todoToDeleteIds?.includes(id)) ||
-            (isUpdatingStatus && id === statusChangeId) ||
+            (isUpdatingStatus && statusChangeId?.includes(id)) ||
             (isUpdatingTitle && id === editingTodoId),
         })}
       >
