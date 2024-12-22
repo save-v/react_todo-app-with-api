@@ -5,8 +5,8 @@ import cN from 'classnames';
 import { Error } from '../../types/Error';
 
 type Props = {
-  errorMessage: Error | null;
-  setErrorMessage: Dispatch<SetStateAction<Error | null>>;
+  errorMessage: Error;
+  setErrorMessage: Dispatch<SetStateAction<Error>>;
 };
 
 export const ErrorNotification: React.FC<Props> = ({
@@ -17,11 +17,11 @@ export const ErrorNotification: React.FC<Props> = ({
     <div
       data-cy="ErrorNotification"
       className={cN('notification is-danger is-light has-text-weight-normal', {
-        hidden: !errorMessage,
+        hidden: errorMessage === Error.Default,
       })}
     >
       <button
-        onClick={() => setErrorMessage(null)}
+        onClick={() => setErrorMessage(Error.Default)}
         data-cy="HideErrorButton"
         type="button"
         className="delete"

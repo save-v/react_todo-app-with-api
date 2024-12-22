@@ -7,6 +7,7 @@ import React, {
   Dispatch,
   SetStateAction,
   FormEvent,
+  useMemo,
 } from 'react';
 import { USER_ID } from './api/todos';
 import { Todo } from './types/Todo';
@@ -16,59 +17,57 @@ import { TodoItem } from './components/TodoItem';
 import { Filter } from './types/Filter';
 import { Error } from './types/Error';
 import { ErrorNotification } from './components/ErrorNotification';
+import { filterTodosByStatus } from './utils/filterTodosByStatus';
+import { removeTodoById } from './utils/removeTodoById';
 
-function filterTodosByStatus(
-  todos: Todo[],
-  completedStatus: boolean | null = null,
-) {
-  if (completedStatus === null) {
-    return todos;
-  }
-
-  return todos.filter(todo => todo.completed === completedStatus);
-}
-
-function removeTodoById(todos: Todo[], id: number) {
-  return todos.filter(todo => todo.id !== id);
-}
+const filterValues = Object.values(Filter);
 
 export const App: React.FC = () => {
   const [todos, setTodos] = useState<Todo[]>([]);
-  const [errorMessage, setErrorMessage] = useState<Error | null>(null);
+  const [errorMessage, setErrorMessage] = useState<Error>(Error.Default);
   const [activeFilter, setActiveFilter] = useState<Filter>(Filter.All);
   const [tempTodo, setTempTodo] = useState<Todo | null>(null);
-  const [todoToDeleteIds, setTodoToDeleteIds] = useState<number[] | null>(null);
+  const [todoToDeleteIds, setTodoToDeleteIds] = useState<number[]>([]);
 
-  const [inputText, setInputText] = useState<string>('');
+  const [inputText, setInputText] = useState('');
   const [filteredTodos, setFilteredTodos] = useState<Todo[]>([]);
   const [statusChangeId, setStatusChangeId] = useState<number[]>([]);
 
   const addTodoField = useRef<HTMLInputElement>(null);
   const errorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const isAllCompleted = !todos.some(todo => todo.completed === false);
-  const hasCompleted = todos.some(todo => todo.completed === true);
+  const isAllCompleted = useMemo(() => {
+    return !todos.some(todo => todo.completed === false);
+  }, [todos]);
 
-  const activeCount: number = todos.reduce((acc, todo) => {
-    if (todo.completed === false) {
-      return acc + 1;
-    }
+  const hasCompleted = useMemo(() => {
+    return todos.some(todo => todo.completed === true);
+  }, [todos]);
 
-    return acc;
-  }, 0);
-  const filterValues = Object.values(Filter);
+  const activeCount: number = useMemo(() => {
+    return todos.reduce((acc, todo) => {
+      if (todo.completed === false) {
+        return acc + 1;
+      }
+
+      return acc;
+    }, 0);
+  }, [todos]);
 
   function trimTitle(text: string) {
     return text.replace(/\s+/g, ' ').trim();
   }
 
-  function ShowError(message: Error) {
+  function showError(message: Error) {
     if (errorTimeoutRef.current) {
       clearTimeout(errorTimeoutRef.current);
     }
 
     setErrorMessage(message);
-    errorTimeoutRef.current = setTimeout(() => setErrorMessage(null), 3000);
+    errorTimeoutRef.current = setTimeout(
+      () => setErrorMessage(Error.Default),
+      3000,
+    );
   }
 
   function filterToBool(filter: Filter) {
@@ -111,7 +110,7 @@ export const App: React.FC = () => {
         changeState(editingTodoId as number, setTodos, fetchedTodo);
       })
       .catch(error => {
-        ShowError(Error.UpdateError);
+        showError(Error.UpdateError);
         throw error;
       });
   }
@@ -126,7 +125,7 @@ export const App: React.FC = () => {
         changeState(id, setFilteredTodos, fetchedTodo);
         changeState(id, setTodos, fetchedTodo);
       })
-      .catch(() => ShowError(Error.UpdateError))
+      .catch(() => showError(Error.UpdateError))
       .finally(() => {
         setStatusChangeId(prev => prev.filter(idParametr => idParametr !== id));
       });
@@ -146,7 +145,7 @@ export const App: React.FC = () => {
         setFilteredTodos(fetchedTodos);
         setFocusOnAddInput();
       })
-      .catch(() => ShowError(Error.LoadError));
+      .catch(() => showError(Error.LoadError));
   }, []);
 
   useEffect(() => {
@@ -161,7 +160,7 @@ export const App: React.FC = () => {
     const title = trimTitle(inputText);
 
     if (title === '') {
-      ShowError(Error.EmptyTitleError);
+      showError(Error.EmptyTitleError);
     } else {
       const newTodo = {
         id: 0,
@@ -179,7 +178,7 @@ export const App: React.FC = () => {
           setTodos(prevTodos => [...prevTodos, fetchedTodo]);
           setFilteredTodos(prevTodos => [...prevTodos, fetchedTodo]);
         })
-        .catch(() => ShowError(Error.AddError))
+        .catch(() => showError(Error.AddError))
         .finally(() => {
           setTempTodo(null);
         });
@@ -193,7 +192,7 @@ export const App: React.FC = () => {
         setTodos(prevTodos => removeTodoById(prevTodos, id));
         setFilteredTodos(prevTodos => removeTodoById(prevTodos, id));
       })
-      .catch(() => ShowError(Error.DeleteError));
+      .catch(() => showError(Error.DeleteError));
   }
 
   function handleClearCompleted() {
@@ -215,6 +214,7 @@ export const App: React.FC = () => {
     });
   }
 
+  //96 221
   function handleFilter(filterParam: Filter) {
     const filter = filterToBool(filterParam);
 

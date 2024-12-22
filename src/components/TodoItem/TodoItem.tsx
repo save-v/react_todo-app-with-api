@@ -18,8 +18,8 @@ type Props = {
   isTemp?: boolean;
   handleTodoStatusChange?: (id: number, newStatus: boolean) => Promise<void>;
   onDelete?: (id: number) => Promise<void>;
-  todoToDeleteIds?: number[] | null;
-  setTodoToDeleteIds?: Dispatch<SetStateAction<number[] | null>>;
+  todoToDeleteIds?: number[];
+  setTodoToDeleteIds?: Dispatch<SetStateAction<number[]>>;
   addTodoField?: RefObject<HTMLInputElement>;
   statusChangeId?: number[];
   handleTitleChange?: (
