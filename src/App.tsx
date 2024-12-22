@@ -30,7 +30,6 @@ export const App: React.FC = () => {
   const [todoToDeleteIds, setTodoToDeleteIds] = useState<number[]>([]);
 
   const [inputText, setInputText] = useState('');
-  const [filteredTodos, setFilteredTodos] = useState<Todo[]>([]);
   const [statusChangeId, setStatusChangeId] = useState<number[]>([]);
 
   const addTodoField = useRef<HTMLInputElement>(null);
@@ -87,14 +86,8 @@ export const App: React.FC = () => {
     todosState: Dispatch<SetStateAction<Todo[]>>,
     updatedTodo: Todo,
   ) {
-    const filter = filterToBool(activeFilter);
-
     todosState(prev => {
-      let changed = prev.map(todo => (todo.id === id ? updatedTodo : todo));
-
-      if (todosState === setFilteredTodos) {
-        changed = filterTodosByStatus(changed, filter);
-      }
+      const changed = prev.map(todo => (todo.id === id ? updatedTodo : todo));
 
       return changed;
     });
@@ -106,7 +99,6 @@ export const App: React.FC = () => {
     return client
       .patch<Todo>(`/todos/${editingTodoId}`, updateStatus)
       .then(fetchedTodo => {
-        changeState(editingTodoId as number, setFilteredTodos, fetchedTodo);
         changeState(editingTodoId as number, setTodos, fetchedTodo);
       })
       .catch(error => {
@@ -122,7 +114,6 @@ export const App: React.FC = () => {
     return client
       .patch<Todo>(`/todos/${id}`, updateStatus)
       .then(fetchedTodo => {
-        changeState(id, setFilteredTodos, fetchedTodo);
         changeState(id, setTodos, fetchedTodo);
       })
       .catch(() => showError(Error.UpdateError))
@@ -142,14 +133,13 @@ export const App: React.FC = () => {
       .get<Todo[]>(`/todos?userId=${USER_ID}`)
       .then(fetchedTodos => {
         setTodos(fetchedTodos);
-        setFilteredTodos(fetchedTodos);
         setFocusOnAddInput();
       })
       .catch(() => showError(Error.LoadError));
   }, []);
 
   useEffect(() => {
-    if (tempTodo === null) {
+    if (!tempTodo) {
       /*tempTodo === null для того, не виконувати це два рази (бо стейт tempTodo спочатку змінюється на об'єкт а потім змінюється на null)*/
       setFocusOnAddInput();
     }
@@ -159,7 +149,7 @@ export const App: React.FC = () => {
     event.preventDefault();
     const title = trimTitle(inputText);
 
-    if (title === '') {
+    if (!title.length) {
       showError(Error.EmptyTitleError);
     } else {
       const newTodo = {
@@ -176,7 +166,6 @@ export const App: React.FC = () => {
         .then(fetchedTodo => {
           setInputText('');
           setTodos(prevTodos => [...prevTodos, fetchedTodo]);
-          setFilteredTodos(prevTodos => [...prevTodos, fetchedTodo]);
         })
         .catch(() => showError(Error.AddError))
         .finally(() => {
@@ -190,7 +179,6 @@ export const App: React.FC = () => {
       .delete(`/todos/${id}`)
       .then(() => {
         setTodos(prevTodos => removeTodoById(prevTodos, id));
-        setFilteredTodos(prevTodos => removeTodoById(prevTodos, id));
       })
       .catch(() => showError(Error.DeleteError));
   }
@@ -213,18 +201,6 @@ export const App: React.FC = () => {
       setFocusOnAddInput();
     });
   }
-
-  //96 221
-  function handleFilter(filterParam: Filter) {
-    const filter = filterToBool(filterParam);
-
-    setFilteredTodos(filterTodosByStatus(todos, filter));
-    setActiveFilter(filterParam);
-  }
-
-  useEffect(() => {
-    handleFilter(activeFilter); //&&&
-  });
 
   function changeStatusAll() {
     const status = isAllCompleted ? false : true;
@@ -262,12 +238,13 @@ export const App: React.FC = () => {
               className="todoapp__new-todo"
               placeholder="What needs to be done?"
               onChange={event => setInputText(event.target.value)}
-              disabled={tempTodo !== null}
+              disabled={!!tempTodo}
             />
           </form>
         </header>
+
         <section className="todoapp__main" data-cy="TodoList">
-          {filteredTodos.map(todo => (
+          {filterTodosByStatus(todos, filterToBool(activeFilter)).map(todo => (
             <TodoItem
               key={todo.id}
               todo={todo}
@@ -280,7 +257,8 @@ export const App: React.FC = () => {
               handleTitleChange={handleTitleChange}
             />
           ))}
-          {tempTodo !== null && (
+
+          {!!tempTodo && (
             <TodoItem key={tempTodo.id} todo={tempTodo} isTemp={true} />
           )}
         </section>
@@ -303,14 +281,13 @@ export const App: React.FC = () => {
                       selected: activeFilter === filter,
                     })}
                     data-cy={`FilterLink${filter}`}
-                    onClick={() => handleFilter(filter)}
+                    onClick={() => setActiveFilter(filter)}
                   >
                     {filter}
                   </a>
                 );
               })}
             </nav>
-
             {/* this button should be disabled if there are no completed todos +++*/}
             <button
               type="button"
