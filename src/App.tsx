@@ -1,17 +1,14 @@
 /* eslint-disable jsx-a11y/label-has-associated-control */
 /* eslint-disable jsx-a11y/control-has-associated-label */
-import React, {
-  useEffect,
-  useRef,
-  useState,
-  Dispatch,
-  SetStateAction,
-  FormEvent,
-  useMemo,
-} from 'react';
-import { USER_ID } from './api/todos';
+import React, { useEffect, useRef, useState, FormEvent, useMemo } from 'react';
+import {
+  deleteTodos,
+  getTodos,
+  patchTodos,
+  postTodos,
+  USER_ID,
+} from './api/todos';
 import { Todo } from './types/Todo';
-import { client } from './utils/fetchClient';
 import cN from 'classnames';
 import { TodoItem } from './components/TodoItem';
 import { Filter } from './types/Filter';
@@ -27,10 +24,9 @@ export const App: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<Error>(Error.Default);
   const [activeFilter, setActiveFilter] = useState<Filter>(Filter.All);
   const [tempTodo, setTempTodo] = useState<Todo | null>(null);
-  const [todoToDeleteIds, setTodoToDeleteIds] = useState<number[]>([]);
+  const [loadingTodoIds, setLoadingTodoIds] = useState<number[]>([]);
 
   const [inputText, setInputText] = useState('');
-  const [statusChangeId, setStatusChangeId] = useState<number[]>([]);
 
   const addTodoField = useRef<HTMLInputElement>(null);
   const errorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -70,36 +66,35 @@ export const App: React.FC = () => {
   }
 
   function filterToBool(filter: Filter) {
-    let boolFilter = null;
+    let boolFilter;
 
-    if (filter === Filter.Active) {
-      boolFilter = false;
-    } else if (filter === Filter.Completed) {
-      boolFilter = true;
+    switch (filter) {
+      case Filter.Active:
+        boolFilter = false;
+        break;
+      case Filter.Completed:
+        boolFilter = true;
+        break;
+      default:
+        boolFilter = null;
+        break;
     }
 
     return boolFilter;
   }
 
-  function changeState(
-    id: number,
-    todosState: Dispatch<SetStateAction<Todo[]>>,
-    updatedTodo: Todo,
-  ) {
-    todosState(prev => {
-      const changed = prev.map(todo => (todo.id === id ? updatedTodo : todo));
-
-      return changed;
-    });
+  function changeTodos(fetchedTodo: Todo) {
+    setTodos(prevTodos =>
+      prevTodos.map(todo => (todo.id === fetchedTodo.id ? fetchedTodo : todo)),
+    );
   }
 
-  function handleTitleChange(newTitle: string, editingTodoId: number | null) {
-    const updateStatus = { title: newTitle };
+  function handleTitleChange(editingTodoId: number | null, newTitle: string) {
+    const updateTitle = { title: newTitle };
 
-    return client
-      .patch<Todo>(`/todos/${editingTodoId}`, updateStatus)
+    return patchTodos(editingTodoId, updateTitle)
       .then(fetchedTodo => {
-        changeState(editingTodoId as number, setTodos, fetchedTodo);
+        changeTodos(fetchedTodo);
       })
       .catch(error => {
         showError(Error.UpdateError);
@@ -108,17 +103,16 @@ export const App: React.FC = () => {
   }
 
   function handleTodoStatusChange(id: number, newStatus: boolean) {
-    setStatusChangeId(prev => [...prev, id]);
+    setLoadingTodoIds(prev => [...prev, id]);
     const updateStatus = { completed: newStatus };
 
-    return client
-      .patch<Todo>(`/todos/${id}`, updateStatus)
+    return patchTodos(id, updateStatus)
       .then(fetchedTodo => {
-        changeState(id, setTodos, fetchedTodo);
+        changeTodos(fetchedTodo);
       })
       .catch(() => showError(Error.UpdateError))
       .finally(() => {
-        setStatusChangeId(prev => prev.filter(idParametr => idParametr !== id));
+        setLoadingTodoIds(prev => prev.filter(idParametr => idParametr !== id));
       });
   }
 
@@ -129,8 +123,7 @@ export const App: React.FC = () => {
   }
 
   useEffect(() => {
-    client
-      .get<Todo[]>(`/todos?userId=${USER_ID}`)
+    getTodos()
       .then(fetchedTodos => {
         setTodos(fetchedTodos);
         setFocusOnAddInput();
@@ -140,7 +133,6 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     if (!tempTodo) {
-      /*tempTodo === null для того, не виконувати це два рази (бо стейт tempTodo спочатку змінюється на об'єкт а потім змінюється на null)*/
       setFocusOnAddInput();
     }
   }, [tempTodo]);
@@ -161,8 +153,7 @@ export const App: React.FC = () => {
 
       setTempTodo(newTodo);
 
-      client
-        .post<Todo>(`/todos`, newTodo)
+      postTodos(newTodo)
         .then(fetchedTodo => {
           setInputText('');
           setTodos(prevTodos => [...prevTodos, fetchedTodo]);
@@ -175,8 +166,7 @@ export const App: React.FC = () => {
   }
 
   function onDelete(id: number): Promise<void> {
-    return client
-      .delete(`/todos/${id}`)
+    return deleteTodos(id)
       .then(() => {
         setTodos(prevTodos => removeTodoById(prevTodos, id));
       })
@@ -189,7 +179,7 @@ export const App: React.FC = () => {
       [] as number[],
     );
 
-    setTodoToDeleteIds(completedTodoIds);
+    setLoadingTodoIds(completedTodoIds);
 
     const promises: Promise<void>[] = [];
 
@@ -218,7 +208,6 @@ export const App: React.FC = () => {
 
       <div className="todoapp__content">
         <header className="todoapp__header">
-          {/* this button should have `active` class only if all todos are completed +++*/}
           {todos.length !== 0 && (
             <button
               type="button"
@@ -228,7 +217,6 @@ export const App: React.FC = () => {
             />
           )}
 
-          {/* Add a todo on form submit +*/}
           <form onSubmit={handleAddTodoOnEnter}>
             <input
               ref={addTodoField}
@@ -250,10 +238,9 @@ export const App: React.FC = () => {
               todo={todo}
               handleTodoStatusChange={handleTodoStatusChange}
               onDelete={onDelete}
-              todoToDeleteIds={todoToDeleteIds}
-              setTodoToDeleteIds={setTodoToDeleteIds}
+              loadingTodoIds={loadingTodoIds}
+              setLoadingTodoIds={setLoadingTodoIds}
               addTodoField={addTodoField}
-              statusChangeId={statusChangeId}
               handleTitleChange={handleTitleChange}
             />
           ))}
@@ -263,14 +250,12 @@ export const App: React.FC = () => {
           )}
         </section>
 
-        {/* Hide the footer if there are no todos +++*/}
         {todos.length !== 0 && (
           <footer className="todoapp__footer" data-cy="Footer">
             <span className="todo-count" data-cy="TodosCounter">
               {activeCount} items left
             </span>
 
-            {/* Active link should have the 'selected' class +++*/}
             <nav className="filter" data-cy="Filter">
               {filterValues.map(filter => {
                 return (
@@ -288,7 +273,6 @@ export const App: React.FC = () => {
                 );
               })}
             </nav>
-            {/* this button should be disabled if there are no completed todos +++*/}
             <button
               type="button"
               className="todoapp__clear-completed"
@@ -302,8 +286,6 @@ export const App: React.FC = () => {
         )}
       </div>
 
-      {/* DON'T use conditional rendering to hide the notification +++*/}
-      {/* Add the 'hidden' class to hide the message smoothly +++*/}
       <ErrorNotification
         errorMessage={errorMessage}
         setErrorMessage={setErrorMessage}

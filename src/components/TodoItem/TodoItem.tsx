@@ -18,13 +18,12 @@ type Props = {
   isTemp?: boolean;
   handleTodoStatusChange?: (id: number, newStatus: boolean) => Promise<void>;
   onDelete?: (id: number) => Promise<void>;
-  todoToDeleteIds?: number[];
-  setTodoToDeleteIds?: Dispatch<SetStateAction<number[]>>;
+  loadingTodoIds?: number[];
+  setLoadingTodoIds?: Dispatch<SetStateAction<number[]>>;
   addTodoField?: RefObject<HTMLInputElement>;
-  statusChangeId?: number[];
   handleTitleChange?: (
-    newTitle: string,
     editingTodoId: number | null,
+    newTitle: string,
   ) => Promise<void> | undefined;
 };
 
@@ -33,10 +32,9 @@ export const TodoItem: React.FC<Props> = ({
   isTemp = false,
   handleTodoStatusChange,
   onDelete,
-  todoToDeleteIds,
-  setTodoToDeleteIds,
+  loadingTodoIds,
+  setLoadingTodoIds,
   addTodoField,
-  statusChangeId,
   handleTitleChange,
 }) => {
   const { title, id, completed } = todo;
@@ -66,7 +64,7 @@ export const TodoItem: React.FC<Props> = ({
   }
 
   function handlerOnDelete() {
-    setTodoToDeleteIds?.([id]);
+    setLoadingTodoIds?.([id]);
     onDelete?.(id).then(() => {
       if (addTodoField?.current !== null) {
         addTodoField?.current.focus();
@@ -98,7 +96,7 @@ export const TodoItem: React.FC<Props> = ({
     }
 
     setIsUpdatingTitle(true);
-    const result = handleTitleChange?.(trimedTitle, editingTodoId);
+    const result = handleTitleChange?.(editingTodoId, trimedTitle);
 
     result
       ?.then(() => {
@@ -168,8 +166,7 @@ export const TodoItem: React.FC<Props> = ({
         className={cN('modal overlay', {
           'is-active':
             isTemp ||
-            todoToDeleteIds?.includes(id) ||
-            statusChangeId?.includes(id) ||
+            loadingTodoIds?.includes(id) ||
             (isUpdatingTitle && id === editingTodoId),
         })}
       >
