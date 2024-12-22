@@ -101,14 +101,14 @@ export const App: React.FC = () => {
     });
   }
 
-  function handleTitleChange(newTitle: string, editingTodoId1: number | null) {
+  function handleTitleChange(newTitle: string, editingTodoId: number | null) {
     const updateStatus = { title: newTitle };
 
     return client
-      .patch<Todo>(`/todos/${editingTodoId1}`, updateStatus)
+      .patch<Todo>(`/todos/${editingTodoId}`, updateStatus)
       .then(fetchedTodo => {
-        changeState(editingTodoId1 as number, setFilteredTodos, fetchedTodo);
-        changeState(editingTodoId1 as number, setTodos, fetchedTodo);
+        changeState(editingTodoId as number, setFilteredTodos, fetchedTodo);
+        changeState(editingTodoId as number, setTodos, fetchedTodo);
       })
       .catch(error => {
         ShowError(Error.UpdateError);
@@ -132,23 +132,27 @@ export const App: React.FC = () => {
       });
   }
 
+  function setFocusOnAddInput() {
+    if (addTodoField.current !== null) {
+      addTodoField.current.focus();
+    }
+  }
+
   useEffect(() => {
     client
       .get<Todo[]>(`/todos?userId=${USER_ID}`)
       .then(fetchedTodos => {
         setTodos(fetchedTodos);
         setFilteredTodos(fetchedTodos);
-        if (addTodoField.current !== null) {
-          addTodoField.current.focus();
-        }
+        setFocusOnAddInput();
       })
       .catch(() => ShowError(Error.LoadError));
   }, []);
 
   useEffect(() => {
-    if (addTodoField.current !== null && tempTodo === null) {
+    if (tempTodo === null) {
       /*tempTodo === null для того, не виконувати це два рази (бо стейт tempTodo спочатку змінюється на об'єкт а потім змінюється на null)*/
-      addTodoField.current.focus();
+      setFocusOnAddInput();
     }
   }, [tempTodo]);
 
@@ -207,10 +211,7 @@ export const App: React.FC = () => {
     });
 
     Promise.all(promises).then(() => {
-      //винести
-      if (addTodoField.current !== null) {
-        addTodoField.current.focus();
-      }
+      setFocusOnAddInput();
     });
   }
 

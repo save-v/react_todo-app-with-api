@@ -45,10 +45,14 @@ export const TodoItem: React.FC<Props> = ({
   const [editingTodoId, setEditingTodoId] = useState<number | null>(null);
   const [isUpdatingTitle, setIsUpdatingTitle] = useState<boolean>(false);
 
-  useEffect(() => {
+  function setFocusOnEditInput() {
     if (editTodoField.current !== null) {
       editTodoField.current.focus();
     }
+  }
+
+  useEffect(() => {
+    setFocusOnEditInput();
   }, [editingTodoId]);
 
   function trimTitle(text: string) {
@@ -102,9 +106,7 @@ export const TodoItem: React.FC<Props> = ({
         setEditingTodoId(null);
       })
       .catch(() => {
-        if (editTodoField.current !== null) {
-          editTodoField.current.focus();
-        }
+        setFocusOnEditInput();
       })
       .finally(() => {
         setIsUpdatingTitle(false);
