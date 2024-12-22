@@ -18,19 +18,14 @@ type Props = {
   isTemp?: boolean;
   handleTodoStatusChange?: (id: number, newStatus: boolean) => Promise<void>;
   onDelete?: (id: number) => Promise<void>;
-  isDeletingTodo?: boolean;
   todoToDeleteIds?: number[] | null;
   setTodoToDeleteIds?: Dispatch<SetStateAction<number[] | null>>;
   addTodoField?: RefObject<HTMLInputElement>;
-  isUpdatingStatus?: boolean;
   statusChangeId?: number[];
-  setEditingTodoId?: Dispatch<SetStateAction<number | null>>;
-  editingTodoId?: number | null;
   handleTitleChange?: (
     newTitle: string,
-    currentTitle: string,
+    editingTodoId: number | null,
   ) => Promise<void> | undefined;
-  isUpdatingTitle?: boolean | null;
 };
 
 export const TodoItem: React.FC<Props> = ({
@@ -38,20 +33,17 @@ export const TodoItem: React.FC<Props> = ({
   isTemp = false,
   handleTodoStatusChange,
   onDelete,
-  isDeletingTodo,
   todoToDeleteIds,
   setTodoToDeleteIds,
   addTodoField,
-  isUpdatingStatus,
   statusChangeId,
-  setEditingTodoId,
-  editingTodoId,
   handleTitleChange,
-  isUpdatingTitle,
 }) => {
   const { title, id, completed } = todo;
   const [inputValue, setInputValue] = useState<string>(title);
   const editTodoField = useRef<HTMLInputElement>(null);
+  const [editingTodoId, setEditingTodoId] = useState<number | null>(null);
+  const [isUpdatingTitle, setIsUpdatingTitle] = useState<boolean>(false);
 
   useEffect(() => {
     if (editTodoField.current !== null) {
@@ -65,7 +57,7 @@ export const TodoItem: React.FC<Props> = ({
 
   function handlerOnKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key === 'Escape') {
-      setEditingTodoId?.(null);
+      setEditingTodoId(null);
     }
   }
 
@@ -93,16 +85,29 @@ export const TodoItem: React.FC<Props> = ({
       return;
     }
 
-    const result = handleTitleChange?.(newTitle, currentTitle);
+    const trimedTitle = trimTitle(newTitle);
+
+    if (trimedTitle === currentTitle) {
+      setEditingTodoId(null);
+
+      return;
+    }
+
+    setIsUpdatingTitle(true);
+    const result = handleTitleChange?.(trimedTitle, editingTodoId);
 
     result
       ?.then(() => {
-        setInputValue(trimTitle(inputValue));
+        setInputValue(trimedTitle);
+        setEditingTodoId(null);
       })
       .catch(() => {
         if (editTodoField.current !== null) {
           editTodoField.current.focus();
         }
+      })
+      .finally(() => {
+        setIsUpdatingTitle(false);
       });
   }
 
@@ -138,7 +143,7 @@ export const TodoItem: React.FC<Props> = ({
       ) : (
         <>
           <span
-            onDoubleClick={() => setEditingTodoId?.(id)}
+            onDoubleClick={() => setEditingTodoId(id)}
             data-cy="TodoTitle"
             className="todo__title"
           >
@@ -156,14 +161,13 @@ export const TodoItem: React.FC<Props> = ({
           </button>
         </>
       )}
-      {/* isDeletingTodo спробувати прибрати*/}
       <div
         data-cy="TodoLoader"
         className={cN('modal overlay', {
           'is-active':
             isTemp ||
-            (isDeletingTodo && todoToDeleteIds?.includes(id)) ||
-            (isUpdatingStatus && statusChangeId?.includes(id)) ||
+            todoToDeleteIds?.includes(id) ||
+            statusChangeId?.includes(id) ||
             (isUpdatingTitle && id === editingTodoId),
         })}
       >

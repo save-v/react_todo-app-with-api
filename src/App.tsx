@@ -40,12 +40,8 @@ export const App: React.FC = () => {
   const [todoToDeleteIds, setTodoToDeleteIds] = useState<number[] | null>(null);
 
   const [inputText, setInputText] = useState<string>('');
-  const [isDeletingTodo, setIsDeletingTodo] = useState<boolean>(false);
-  const [isUpdatingStatus, setIsUpdatingStatus] = useState<boolean>(false);
   const [filteredTodos, setFilteredTodos] = useState<Todo[]>([]);
   const [statusChangeId, setStatusChangeId] = useState<number[]>([]);
-  const [editingTodoId, setEditingTodoId] = useState<number | null>(null);
-  const [isUpdatingTitle, setIsUpdatingTitle] = useState<boolean>(false);
 
   const addTodoField = useRef<HTMLInputElement>(null);
   const errorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -105,40 +101,24 @@ export const App: React.FC = () => {
     });
   }
 
-  function handleTitleChange(newTitle: string, currentTitle: string) {
-    const trimedTitle = trimTitle(newTitle);
-
-    if (trimedTitle === currentTitle) {
-      setEditingTodoId(null);
-
-      return;
-    }
-
-    const updateStatus = { title: trimedTitle };
-
-    setIsUpdatingTitle(true);
+  function handleTitleChange(newTitle: string, editingTodoId1: number | null) {
+    const updateStatus = { title: newTitle };
 
     return client
-      .patch<Todo>(`/todos/${editingTodoId}`, updateStatus)
+      .patch<Todo>(`/todos/${editingTodoId1}`, updateStatus)
       .then(fetchedTodo => {
-        changeState(editingTodoId as number, setFilteredTodos, fetchedTodo);
-        changeState(editingTodoId as number, setTodos, fetchedTodo);
-        setEditingTodoId(null);
+        changeState(editingTodoId1 as number, setFilteredTodos, fetchedTodo);
+        changeState(editingTodoId1 as number, setTodos, fetchedTodo);
       })
       .catch(error => {
         ShowError(Error.UpdateError);
         throw error;
-      })
-      .finally(() => {
-        setIsUpdatingTitle(false);
       });
   }
 
   function handleTodoStatusChange(id: number, newStatus: boolean) {
     setStatusChangeId(prev => [...prev, id]);
     const updateStatus = { completed: newStatus };
-
-    setIsUpdatingStatus(true);
 
     return client
       .patch<Todo>(`/todos/${id}`, updateStatus)
@@ -149,7 +129,6 @@ export const App: React.FC = () => {
       .catch(() => ShowError(Error.UpdateError))
       .finally(() => {
         setStatusChangeId(prev => prev.filter(idParametr => idParametr !== id));
-        setIsUpdatingStatus(false);
       });
   }
 
@@ -204,18 +183,13 @@ export const App: React.FC = () => {
   }
 
   function onDelete(id: number): Promise<void> {
-    setIsDeletingTodo(true);
-
     return client
       .delete(`/todos/${id}`)
       .then(() => {
         setTodos(prevTodos => removeTodoById(prevTodos, id));
         setFilteredTodos(prevTodos => removeTodoById(prevTodos, id));
       })
-      .catch(() => ShowError(Error.DeleteError))
-      .finally(() => {
-        setIsDeletingTodo(false);
-      });
+      .catch(() => ShowError(Error.DeleteError));
   }
 
   function handleClearCompleted() {
@@ -298,16 +272,11 @@ export const App: React.FC = () => {
               todo={todo}
               handleTodoStatusChange={handleTodoStatusChange}
               onDelete={onDelete}
-              isDeletingTodo={isDeletingTodo}
               todoToDeleteIds={todoToDeleteIds}
               setTodoToDeleteIds={setTodoToDeleteIds}
               addTodoField={addTodoField}
-              isUpdatingStatus={isUpdatingStatus}
               statusChangeId={statusChangeId}
-              setEditingTodoId={setEditingTodoId}
-              editingTodoId={editingTodoId}
               handleTitleChange={handleTitleChange}
-              isUpdatingTitle={isUpdatingTitle}
             />
           ))}
           {tempTodo !== null && (
