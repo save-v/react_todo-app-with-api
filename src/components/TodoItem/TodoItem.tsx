@@ -12,6 +12,7 @@ import React, {
 } from 'react';
 import { Todo } from '../../types/Todo';
 import cN from 'classnames';
+import { trimTitle } from '../../utils/trimTitle';
 
 type Props = {
   todo: Todo;
@@ -52,10 +53,6 @@ export const TodoItem: React.FC<Props> = ({
   useEffect(() => {
     setFocusOnEditInput();
   }, [editingTodoId]);
-
-  function trimTitle(text: string) {
-    return text.replace(/\s+/g, ' ').trim();
-  }
 
   function handlerOnKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key === 'Escape') {
